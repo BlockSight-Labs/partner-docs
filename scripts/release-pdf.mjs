@@ -104,6 +104,7 @@ if (listOnly) {
     console.log(`  latest published: ${latest ? `v${latest.version} (${latest.name.slice(0, 10)})` : "none"}`);
     console.log(`  working version:  v${working}`);
     console.log(`  release candidate: ${latestRc ? `v${working}-rc.${latestRc}` : "none"}`);
+    console.log(`  status:            ${!latest ? "not yet published" : compareVersions(working, latest.version) > 0 ? "working version is unreleased" : compareVersions(working, latest.version) === 0 ? "working version is already published" : "version regression - fix required"}`);
   }
   process.exit(0);
 }
@@ -119,6 +120,7 @@ const releaseDate = [today.getFullYear(), String(today.getMonth() + 1).padStart(
 let suffix;
 let resultingVersion = version;
 if (candidate) {
+  if (info.finals.some((item) => item.version === version)) fail(`final v${version} already exists; advance the source version before creating another candidate`);
   const rcPattern = new RegExp(`-v${version.replace(".", "\\.")}-rc\\.(\\d+)\\.pdf$`);
   const nextRc = Math.max(0, ...info.files.map((name) => Number(name.match(rcPattern)?.[1] || 0))) + 1;
   suffix = `v${version}-rc.${nextRc}`;
@@ -146,7 +148,7 @@ if (!candidate) {
   const markdown = readFileSync(source, "utf8");
   const frontMatter = markdown.match(/^---\r?\n([\s\S]*?)\r?\n---/);
   if (!frontMatter || !/^version:\s*['"]?\d+\.\d+['"]?\s*$/m.test(frontMatter[1])) fail("release was created, but the source version line could not be updated automatically");
-  const updatedFrontMatter = frontMatter[0].replace(/^version:\s*['"]?\d+\.\d+['"]?\s*$/m, `version: ${resultingVersion}`);
+  const updatedFrontMatter = frontMatter[0].replace(/^version:\s*['"]?\d+\.\d+['"]?\s*$/m, `version: "${resultingVersion}"`);
   writeFileSync(source, updatedFrontMatter + markdown.slice(frontMatter[0].length));
   console.log(`Advanced ${normalize(relative(root, source))} to working v${resultingVersion}.`);
 }

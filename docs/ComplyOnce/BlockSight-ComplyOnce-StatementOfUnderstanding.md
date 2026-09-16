@@ -4,7 +4,8 @@ subtitle: "Statement of Understanding"
 lang: en-US
 plantuml-format: svg
 style: technical
-version: 1.0
+version: "1.0"
+classification: "Commercial in Confidence"
 ---
 
 # Scope

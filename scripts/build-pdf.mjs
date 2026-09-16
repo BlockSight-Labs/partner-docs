@@ -38,6 +38,8 @@ const run = (command, commandArgs, options = {}) => {
 };
 const cssString = (value) => `"${value.replaceAll("\\", "\\\\").replaceAll('"', '\\"')}"`;
 const escapeHtml = (value) => String(value).replace(/[&<>\"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+const now = new Date();
+const buildDate = [now.getFullYear(), String(now.getMonth() + 1).padStart(2, "0"), String(now.getDate()).padStart(2, "0")].join("-");
 
 const brandPath = join(root, "pdf/document.json");
 const brand = JSON.parse(readFileSync(brandPath, "utf8"));
@@ -108,6 +110,12 @@ function versionFor(doc) {
   return version;
 }
 
+function classificationFor(doc) {
+  const classification = metadataText(metadataFor(doc).classification) || "Commercial in Confidence";
+  if (classification.length > 80 || /[\r\n]/.test(classification)) fail(`invalid classification in ${doc.source}`);
+  return classification;
+}
+
 if (listOnly) {
   for (const doc of selected) console.log(`${doc.source} -> ${normalize(relative(root, outputFor(doc)))} [${styleFor(doc)}, working v${versionFor(doc)}]`);
   process.exit(0);
@@ -131,6 +139,7 @@ for (const doc of selected) {
   if (!existsSync(source)) fail(`source not found: ${doc.source}`);
   const style = styleFor(doc);
   const version = versionFor(doc);
+  const classification = classificationFor(doc);
   if (releaseVersion && version !== releaseVersion) fail(`release version ${releaseVersion} does not match ${doc.source} version ${version}`);
   const dependencies = [source, brandPath, join(root, "pdf/document.css"), resolve(root, brand.logo), resolve(root, brand.watermark || brand.logo)];
   const newest = Math.max(...dependencies.map((file) => statSync(file).mtimeMs));
@@ -153,9 +162,7 @@ for (const doc of selected) {
     const watermark = resolve(root, brand.watermark || brand.logo);
     writeFileSync(header, `<div class="document-watermark" aria-hidden="true"><img src="${pathToFileURL(watermark).href}" alt=""></div><header class="document-header"><img src="${pathToFileURL(logo).href}" alt="${escapeHtml(brand.companyName)}"><div class="entity">${escapeHtml(brand.companyName)}<br>${escapeHtml(brand.companyDescriptor)}</div></header>`);
     const css = join(work, "document.css");
-    const footer = releaseVersion
-      ? `${brand.companyName} - Version ${releaseVersion} - Released ${releaseDate}`
-      : `${brand.companyName} - Working version ${version}`;
+    const footer = `${brand.companyName} - ${classification} - v${releaseVersion || version} - ${releaseDate || buildDate}`;
     writeFileSync(css, `${readFileSync(join(root, "pdf/document.css"), "utf8")}\n:root { --accent: ${brand.accentColor}; --paper-size: ${brand.paperSize}; --footer-left: ${cssString(footer)}; }\n`);
     const html = join(work, "document.html");
     run("pandoc", [staged, "--from=gfm+raw_html", "--to=html5", "--standalone", `--include-before-body=${header}`, `--css=${css}`, `--resource-path=${dirname(source)}:${root}`, "--output", html]);

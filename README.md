@@ -10,11 +10,12 @@ title: "Partner Integration"
 subtitle: "Technical Overview"
 lang: en-US
 style: technical
-version: 1.0
+version: "1.0"
+classification: "Commercial in Confidence"
 ---
 ```
 
-`style` may be `technical` (modern and less formal) or `official` (serif and formal). It defaults to `technical` when omitted. `version` is required and uses `major.minor` format. Keeping this metadata in the source means the system does not need a parallel per-file JSON tree.
+`style` may be `technical` (modern and less formal) or `official` (serif and formal). It defaults to `technical` when omitted. `version` is required and uses `major.minor` format. `classification` defaults to `Commercial in Confidence`, but can be overridden for public or differently classified material. Keeping this metadata in the source means the system does not need a parallel per-file JSON tree.
 
 ## Build the live set
 
@@ -43,7 +44,7 @@ Generated PDFs are ignored by Git and written to `output/pdf/`, mirroring each s
 To build one listed document:
 
 ```sh
-npm run pdf -- "docs/ComplyOnce/2026-09-16-BlockSight-ComplyOnce-StatementOfUnderstanding.md"
+npm run pdf -- "docs/ComplyOnce/BlockSight-ComplyOnce-StatementOfUnderstanding.md"
 ```
 
 ## Document discovery
@@ -59,20 +60,20 @@ No central document manifest or parallel JSON metadata is required. Add, rename,
 
 ## Versioned releases
 
-The PDF below `output/pdf/` is the mutable live preview for the version declared in the Markdown source. Its footer identifies it as a working version. Published releases are immutable, Git-tracked snapshots below `published/`.
+The PDF below `output/pdf/` is the mutable live preview for the version declared in the Markdown source. Preview, candidate, and final PDF footers all use the same compact format: `BlockSight Labs Inc. - Commercial in Confidence - v1.0 - YYYY-MM-DD`. Published releases are immutable, Git-tracked snapshots below `published/`.
 
 Create a release candidate while continuing to work on the same version:
 
 ```sh
-npm run release -- "docs/ComplyOnce/2026-09-16-BlockSight-ComplyOnce-StatementOfUnderstanding.md" --candidate
+npm run release -- "docs/ComplyOnce/BlockSight-ComplyOnce-StatementOfUnderstanding.md" --candidate
 ```
 
-Repeated candidate releases automatically create `v1.0-rc.1`, `v1.0-rc.2`, and so on. They do not change the source version.
+Repeated candidate releases automatically create `v1.0-rc.1`, `v1.0-rc.2`, and so on. They do not change the source version. Once final `v1.0` exists, further `v1.0` candidates are refused; advance to the next working version instead.
 
 Create the final release:
 
 ```sh
-npm run release -- "docs/ComplyOnce/2026-09-16-BlockSight-ComplyOnce-StatementOfUnderstanding.md"
+npm run release -- "docs/ComplyOnce/BlockSight-ComplyOnce-StatementOfUnderstanding.md"
 ```
 
 The final release is written to a stable per-document history such as:
@@ -83,10 +84,10 @@ published/ComplyOnce/BlockSight-ComplyOnce-StatementOfUnderstanding/
 └── 2026-09-16-BlockSight-ComplyOnce-StatementOfUnderstanding-v1.0.pdf
 ```
 
-After a successful final release, the source automatically advances from `version: 1.0` to `version: 1.1`. To choose the next major version instead:
+After a successful final release, the source automatically advances from `version: "1.0"` to `version: "1.1"`. Versions are quoted so YAML preserves the minor component. To choose the next major version instead:
 
 ```sh
-npm run release -- "docs/ComplyOnce/2026-09-16-BlockSight-ComplyOnce-StatementOfUnderstanding.md" --next 2.0
+npm run release -- "docs/ComplyOnce/BlockSight-ComplyOnce-StatementOfUnderstanding.md" --next 2.0
 ```
 
 Final releases are never overwritten. If `v1.0` is already final, a correction must be released as a newer version. Preview a release operation without writing files by adding `--dry-run`.
