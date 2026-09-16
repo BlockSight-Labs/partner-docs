@@ -7,6 +7,8 @@
     "pdf:force": "node scripts/build-pdf.mjs --force",
     "pdf:list": "node scripts/build-pdf.mjs --list",
     "pdf:live": "node scripts/build-pdf.mjs --force --prune",
+    "release": "node scripts/release-pdf.mjs",
+    "releases:list": "node scripts/release-pdf.mjs --list",
     "hooks:install": "git config core.hooksPath .githooks"
   }
 }
