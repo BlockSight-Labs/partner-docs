@@ -2,7 +2,18 @@
 
 This repository maintains the live, sendable PDF set for partner documents, proposals, technical material, and other external-facing documents.
 
-All document prose uses US English. New Markdown sources should include `lang: en-US` in their YAML front matter.
+All document prose uses US English. Document-specific presentation metadata lives with the Markdown source in YAML front matter:
+
+```yaml
+---
+title: "Partner Integration"
+subtitle: "Technical Overview"
+lang: en-US
+style: technical
+---
+```
+
+`style` may be `technical` (modern and less formal) or `official` (serif and formal). It defaults to `technical` when omitted. Keeping this metadata in the source means the system does not need a parallel per-file JSON tree.
 
 ## Build the live set
 
@@ -39,10 +50,10 @@ npm run pdf -- "docs/ComplyOnce/2026-09-16-BlockSight-ComplyOnce-StatementOfUnde
 The `docs/` tree may contain any number of work-in-progress files. `documents.json` is the deliberate list of documents whose PDFs are kept live and ready to send. Add a source to that file only when it belongs in the live PDF set:
 
 ```json
-{"source":"docs/Partner/Proposal.md","style":"technical"}
+"docs/Partner/Proposal.md"
 ```
 
-The style may be `technical` (modern and less formal) or `official` (serif and formal). An optional `output` overrides the mirrored path below `output/pdf/`.
+Use a string when the default mirrored output path is appropriate. An object with `source` and optional `output` remains available when the generated PDF needs a non-default path. Document style is always read from the Markdown front matter.
 
 ## PlantUML
 

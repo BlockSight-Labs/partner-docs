@@ -16,6 +16,7 @@ const run = (command, commandArgs, options = {}) => {
   const result = spawnSync(command, commandArgs, { encoding: "utf8", ...options });
   if (result.error?.code === "ENOENT") fail(`${command} is required but was not found`);
   if (result.status !== 0) fail(`${command} failed:\n${result.stderr || result.stdout}`);
+  return result;
 };
 const cssString = (value) => `"${value.replaceAll("\\", "\\\\").replaceAll('"', '\\"')}"`;
 const escapeHtml = (value) => String(value).replace(/[&<>\"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
@@ -45,8 +46,42 @@ function outputFor(doc) {
   if (!output.startsWith(`${outputRoot}${sep}`)) fail(`output must remain below output/pdf/: ${doc.output}`);
   return output;
 }
+
+const metadataCache = new Map();
+function metadataFor(doc) {
+  const source = resolve(root, doc.source);
+  if (metadataCache.has(source)) return metadataCache.get(source);
+  if (!existsSync(source)) fail(`source not found: ${doc.source}`);
+  const result = run("pandoc", [source, "--from=markdown", "--to=json"]);
+  let document;
+  try { document = JSON.parse(result.stdout); }
+  catch { fail(`could not read Pandoc metadata from ${doc.source}`); }
+  const metadata = document.meta || {};
+  metadataCache.set(source, metadata);
+  return metadata;
+}
+
+function metadataText(value) {
+  if (!value) return undefined;
+  if (value.t === "MetaString") return value.c;
+  if (value.t === "MetaInlines") {
+    return value.c.map((part) => {
+      if (part.t === "Str" || part.t === "Code") return typeof part.c === "string" ? part.c : part.c.at(-1);
+      if (part.t === "Space" || part.t === "SoftBreak" || part.t === "LineBreak") return " ";
+      return "";
+    }).join("").trim();
+  }
+  return undefined;
+}
+
+function styleFor(doc) {
+  const style = metadataText(metadataFor(doc).style) || "technical";
+  if (!["technical", "official"].includes(style)) fail(`unsupported style '${style}' in ${doc.source}; use technical or official`);
+  return style;
+}
+
 if (listOnly) {
-  for (const doc of selected) console.log(`${doc.source} -> ${normalize(relative(root, outputFor(doc)))} [${doc.style || "technical"}]`);
+  for (const doc of selected) console.log(`${doc.source} -> ${normalize(relative(root, outputFor(doc)))} [${styleFor(doc)}]`);
   process.exit(0);
 }
 function renderPlantUml(source, target, cwd) {
@@ -65,6 +100,7 @@ for (const doc of selected) {
   const source = resolve(root, doc.source);
   const output = outputFor(doc);
   if (!existsSync(source)) fail(`source not found: ${doc.source}`);
+  const style = styleFor(doc);
   const dependencies = [source, manifestPath, brandPath, join(root, "pdf/document.css"), resolve(root, brand.logo), resolve(root, brand.watermark || brand.logo)];
   const newest = Math.max(...dependencies.map((file) => statSync(file).mtimeMs));
   if (!force && existsSync(output) && statSync(output).mtimeMs >= newest) { console.log(`Unchanged ${normalize(relative(root, output))}`); unchanged += 1; continue; }
@@ -89,7 +125,7 @@ for (const doc of selected) {
     writeFileSync(css, `${readFileSync(join(root, "pdf/document.css"), "utf8")}\n:root { --accent: ${brand.accentColor}; --paper-size: ${brand.paperSize}; --footer-left: ${cssString(brand.companyName)}; }\n`);
     const html = join(work, "document.html");
     run("pandoc", [staged, "--from=gfm+raw_html", "--to=html5", "--standalone", `--include-before-body=${header}`, `--css=${css}`, `--resource-path=${dirname(source)}:${root}`, "--output", html]);
-    writeFileSync(html, readFileSync(html, "utf8").replace("<body>", `<body class="style-${escapeHtml(doc.style || "technical")}">`));
+    writeFileSync(html, readFileSync(html, "utf8").replace("<body>", `<body class="style-${escapeHtml(style)}">`));
     mkdirSync(dirname(output), { recursive: true });
     run("weasyprint", [html, output]);
     console.log(`Created ${normalize(relative(root, output))} (${diagram} PlantUML diagram${diagram === 1 ? "" : "s"})`);

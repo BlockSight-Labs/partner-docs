@@ -3,6 +3,7 @@ title: "BlockSight / ComplyOnce Integration"
 subtitle: "Statement of Understanding"
 lang: en-US
 plantuml-format: svg
+style: technical
 ---
 
 # Scope
