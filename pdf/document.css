@@ -1,0 +1,38 @@
+@page {
+  size: var(--paper-size);
+  margin: 0.9in 0.72in 0.72in;
+  @bottom-left { content: var(--footer-left); color: #708090; font-family: Arial, Helvetica, sans-serif; font-size: 7.5pt; }
+  @bottom-right { content: "Page " counter(page) " of " counter(pages); color: #708090; font-family: Arial, Helvetica, sans-serif; font-size: 7.5pt; }
+}
+:root { --accent: #17253f; --paper-size: A4; --footer-left: "BlockSight Labs Inc."; }
+html { color: #27313f; font-family: Arial, Helvetica, sans-serif; font-size: 10pt; line-height: 1.5; }
+body { margin: 0; }
+.document-watermark { left: 30%; opacity: 0.012; position: fixed; top: 37%; width: 40%; z-index: -1; }
+.document-watermark img { width: 100%; }
+.document-header { align-items: center; border-bottom: 1.5pt solid var(--accent); display: flex; justify-content: space-between; margin-bottom: 24pt; padding-bottom: 8pt; }
+.document-header img { height: 28pt; width: 28pt; }
+.document-header .entity { color: #657285; font-size: 7.5pt; letter-spacing: .045em; text-align: right; text-transform: uppercase; }
+#title-block-header { border-bottom: 0; margin: 0 0 22pt; text-align: left; }
+#title-block-header .title { font-size: 22pt; margin-bottom: 5pt; text-align: left; text-transform: none; }
+#title-block-header .subtitle { color: #637083; font-size: 12pt; font-weight: 400; margin: 0; }
+h1, h2, h3, h4 { color: var(--accent); font-family: Arial, Helvetica, sans-serif; break-after: avoid; }
+h1 { font-size: 18pt; margin: 25pt 0 10pt; }
+h2 { border-bottom: .6pt solid #cbd3dc; font-size: 13pt; margin: 22pt 0 8pt; padding-bottom: 4pt; }
+h3 { font-size: 11pt; margin: 17pt 0 6pt; }
+p { margin: 0 0 9pt; orphans: 3; widows: 3; }
+ul, ol { margin: 7pt 0 11pt 20pt; padding: 0; }
+li { margin-bottom: 3pt; }
+blockquote { border-left: 2.5pt solid #d89b22; color: #4e5a6a; margin: 14pt 0; padding: 6pt 12pt; }
+code { background: #f1f4f7; font-family: Menlo, Consolas, monospace; font-size: 8.2pt; padding: 1pt 2pt; }
+pre { background: #f5f7f9; border: .6pt solid #d9dfe5; padding: 8pt; white-space: pre-wrap; }
+table { border-collapse: collapse; font-size: 9pt; margin: 12pt 0; width: 100%; }
+thead { display: table-header-group; }
+tr, figure, .plantuml-diagram { break-inside: avoid; }
+th, td { border: .6pt solid #b7c1cc; padding: 5pt 6pt; text-align: left; vertical-align: top; }
+th { background: #eef2f6; color: var(--accent); }
+img { max-width: 100%; }
+.plantuml-diagram { margin: 14pt auto 18pt; text-align: center; }
+.plantuml-diagram img { max-height: 8.2in; }
+body.style-official { font-family: Georgia, "Times New Roman", serif; font-size: 10.5pt; }
+body.style-official #title-block-header, body.style-official #title-block-header .title { text-align: center; text-transform: uppercase; }
+body.style-official h1 { text-align: center; text-transform: uppercase; }
