@@ -1,1 +1,12 @@
-{"name":"blocksight-partner-docs","private":true,"type":"module","scripts":{"pdf":"node scripts/build-pdf.mjs","pdf:force":"node scripts/build-pdf.mjs --force","pdf:list":"node scripts/build-pdf.mjs --list"}}
+{
+  "name": "blocksight-partner-docs",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "pdf": "node scripts/build-pdf.mjs",
+    "pdf:force": "node scripts/build-pdf.mjs --force",
+    "pdf:list": "node scripts/build-pdf.mjs --list",
+    "pdf:live": "node scripts/build-pdf.mjs --force --prune",
+    "hooks:install": "git config core.hooksPath .githooks"
+  }
+}

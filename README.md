@@ -18,12 +18,20 @@ Then build every live document:
 npm run pdf
 ```
 
-Generated PDFs are ignored by Git and written to `output/pdf/`, mirroring each source path below `docs/`. Use `npm run pdf:list` to inspect the live set and `npm run pdf:force` to rebuild it.
+Install the tracked pre-commit hook once per checkout:
+
+```sh
+npm run hooks:install
+```
+
+Every commit will then force-refresh the complete live PDF set and remove stale generated PDFs left behind by source renames. The PDFs remain local and Git-ignored by design, so they will not appear in the commit itself.
+
+Generated PDFs are ignored by Git and written to `output/pdf/`, mirroring each source path below `docs/`. Use `npm run pdf:list` to inspect the live set, `npm run pdf:force` to rebuild it, or `npm run pdf:live` to rebuild and prune PDFs that are no longer in the live set.
 
 To build one listed document:
 
 ```sh
-npm run pdf -- "docs/ComplyOnce/BlockSight ComplyOnce StatementOfUnderstanding.md"
+npm run pdf -- "docs/ComplyOnce/2026-09-16-BlockSight-ComplyOnce-StatementOfUnderstanding.md"
 ```
 
 ## WIP versus live documents

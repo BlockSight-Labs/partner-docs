@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, dirname, extname, join, relative, resolve, sep } from "node:path";
 import { spawnSync } from "node:child_process";
@@ -9,6 +9,7 @@ const root = resolve(dirname(new URL(import.meta.url).pathname), "..");
 const args = process.argv.slice(2);
 const force = args.includes("--force");
 const listOnly = args.includes("--list");
+const prune = args.includes("--prune");
 const requested = args.filter((arg) => !arg.startsWith("--"));
 const fail = (message) => { console.error(`pdf: ${message}`); process.exit(1); };
 const run = (command, commandArgs, options = {}) => {
@@ -20,7 +21,7 @@ const cssString = (value) => `"${value.replaceAll("\\", "\\\\").replaceAll('"', 
 const escapeHtml = (value) => String(value).replace(/[&<>\"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
 
 if (args.includes("--help") || args.includes("-h")) {
-  console.log("Usage: npm run pdf -- [source.md ...] [--force] [--list]\n\nWith no source, builds every live document in documents.json.");
+  console.log("Usage: npm run pdf -- [source.md ...] [--force] [--prune] [--list]\n\nWith no source, builds every live document in documents.json. --prune removes PDFs no longer represented by the live list.");
   process.exit(0);
 }
 const manifestPath = join(root, "documents.json");
@@ -32,13 +33,17 @@ const normalize = (path) => path.split(sep).join("/");
 const docs = manifest.documents.map((entry) => typeof entry === "string" ? { source: entry } : entry);
 const selected = requested.length ? docs.filter((doc) => requested.some((item) => resolve(root, item) === resolve(root, doc.source))) : docs;
 if (requested.length && selected.length !== new Set(requested.map((item) => resolve(root, item))).size) fail("every requested source must be listed in documents.json");
+if (requested.length && prune) fail("--prune can only be used when building the complete live set");
 
 function outputFor(doc) {
   const source = resolve(root, doc.source);
   const docsRoot = resolve(root, "docs");
   if (!source.startsWith(`${docsRoot}${sep}`)) fail(`source must be below docs/: ${doc.source}`);
   const mirrored = relative(docsRoot, source).slice(0, -extname(source).length) + ".pdf";
-  return resolve(root, "output/pdf", doc.output || mirrored);
+  const outputRoot = resolve(root, "output/pdf");
+  const output = resolve(outputRoot, doc.output || mirrored);
+  if (!output.startsWith(`${outputRoot}${sep}`)) fail(`output must remain below output/pdf/: ${doc.output}`);
+  return output;
 }
 if (listOnly) {
   for (const doc of selected) console.log(`${doc.source} -> ${normalize(relative(root, outputFor(doc)))} [${doc.style || "technical"}]`);
@@ -91,4 +96,23 @@ for (const doc of selected) {
     created += 1;
   } finally { rmSync(work, { recursive: true, force: true }); }
 }
-console.log(`PDF build complete: ${created} created, ${unchanged} unchanged.`);
+
+let pruned = 0;
+if (prune) {
+  const outputRoot = resolve(root, "output/pdf");
+  const expected = new Set(docs.map((doc) => outputFor(doc)));
+  const visit = (directory) => {
+    if (!existsSync(directory)) return;
+    for (const entry of readdirSync(directory, { withFileTypes: true })) {
+      const path = join(directory, entry.name);
+      if (entry.isDirectory()) visit(path);
+      else if (entry.isFile() && extname(entry.name).toLowerCase() === ".pdf" && !expected.has(path)) {
+        rmSync(path);
+        console.log(`Pruned ${normalize(relative(root, path))}`);
+        pruned += 1;
+      }
+    }
+  };
+  visit(outputRoot);
+}
+console.log(`PDF build complete: ${created} created, ${unchanged} unchanged, ${pruned} pruned.`);

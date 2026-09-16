@@ -7,11 +7,11 @@ plantuml-format: svg
 
 # Scope
 
-ComplyOnce provides identity, KYC, eligibility, X-Road and orchestration.
+ComplyOnce owns and operates the identity, KYC, eligibility, X-Road, and orchestration layers, including configuration and operation of its X-Road Security Server.
 
-BlockSight provides wallet intelligence through its existing multi-tenant API.
+BlockSight provides wallet intelligence through its existing multi-tenant, metered API.
 
-BlockSight does not host or configure X-Road.
+BlockSight does not host, configure, or participate directly in X-Road. BlockSight is not an X-Road member or subsystem in this integration. ComplyOnce consumes the BlockSight API as a downstream service using a BlockSight-issued server-side credential.
 
 ## System Architecture
 
@@ -31,6 +31,7 @@ actor "Bank" as Bank
 component "Bank X-Road\nSecurity Server" as BankXR
 component "ComplyOnce X-Road\nSecurity Server" as COXR
 component "ComplyOnce\nIntegration API" as CO
+component "ComplyOnce Identity\n& Eligibility Service" as Identity
 
 component "BlockSight API\n\nMulti-tenant\nMetered API\nWallet intelligence" as BS
 database "ComplyOnce\nKYC Store" as KYC
@@ -39,15 +40,18 @@ Bank --> BankXR
 BankXR --> COXR : X-Road
 COXR --> CO
 
-CO --> BS : HTTPS\nAPI key
-CO --> KYC : KYC / ZK proof
+CO --> Identity : Eligibility check
+Identity --> KYC : KYC / proof verification
+CO --> BS : HTTPS\nBearer: BlockSight API key
 
 @enduml
 ```
 
-**Integration boundary:** Bank to X-Road to ComplyOnce to the BlockSight API.
+**Integration boundary:** Bank backend to X-Road to ComplyOnce to the BlockSight API.
 
-KYC source data remains within ComplyOnce. BlockSight receives only the data required for wallet analysis.
+ComplyOnce is the BlockSight API consumer and tenant for this integration. BlockSight authentication and usage metering are performed against the ComplyOnce credential unless a separate per-bank tenancy model is agreed. Downstream banks are not BlockSight tenants and do not receive BlockSight credentials under this model.
+
+KYC source data and zero-knowledge proof verification remain within ComplyOnce. BlockSight receives only the wallet and request context required for wallet intelligence and does not receive or verify underlying KYC evidence, zero-knowledge proofs, or witness material. ComplyOnce converts its identity and eligibility results into the final policy decision.
 
 ## BlockSight Wallet Scoring
 
@@ -62,30 +66,35 @@ actor "ComplyOnce\nIntegration API" as Client
 participant "BlockSight API" as API
 participant "BlockSight\nScoring Pipeline" as Scoring
 
-Client -> API: GET /v1/wallets/{chain}/{wallet}/intelligence\nAuthorization: Bearer <API key>
+Client -> API: GET /v1/wallets/{chain}/{wallet_address}/intelligence\nAuthorization: Bearer <BlockSight API key>
 
 activate API
 API -> Scoring: Start wallet indexing + scoring
 API --> Client: 202 Accepted\njob_id\nestimated_ready_at
 deactivate API
 
-loop Poll until completed
+loop Poll while non-terminal
     Client -> API: GET /v1/jobs/{job_id}
     API --> Client: 200 OK\nqueued / initializing / running
 end
 
-Scoring --> API: Scoring complete
+Scoring --> API: completed / failed / expired
 
 Client -> API: GET /v1/jobs/{job_id}
-API --> Client: 200 OK\ncompleted
-
-Client -> API: GET /v1/wallets/{chain}/{wallet}/intelligence
-API --> Client: 200 OK\nwallet intelligence
+alt completed
+    API --> Client: 200 OK\ncompleted
+    Client -> API: GET /v1/wallets/{chain}/{wallet_address}/intelligence
+    API --> Client: 200 OK\nwallet intelligence
+else failed or expired
+    API --> Client: 200 OK\nfailed / expired\nerror details
+end
 
 @enduml
 ```
 
-New-wallet scoring is asynchronous. Expected initial processing time is **under 30 seconds**, subject to chain and provider conditions. The API contract exposes `estimated_ready_at`.
+For an already indexed wallet, BlockSight may return wallet intelligence immediately with `200 OK`. If indexing is required, BlockSight returns `202 Accepted` with a `job_id` and `estimated_ready_at`, and ComplyOnce polls the job until it reaches a terminal state: `completed`, `failed`, or `expired`. Wallet intelligence is retrieved after successful completion; ComplyOnce handles `failed` or `expired` as terminal failures.
+
+The target initial processing time for a newly indexed wallet is **under 30 seconds**. Actual completion time may vary by chain and upstream provider conditions; `estimated_ready_at` is the API-provided estimate and is not an SLA commitment.
 
 ## End-to-End Flow
 
@@ -97,12 +106,12 @@ title ComplyOnce / X-Road / BlockSight - End-to-End Flow
 autonumber
 
 actor "User" as User
-participant "ComplyOnce\nIdentity / KYC" as Identity
-participant "Bank / Consuming\nService" as Bank
-participant "Bank X-Road\nSecurity Server" as BankXR
-participant "ComplyOnce X-Road\nSecurity Server" as COXR
-participant "ComplyOnce\nIntegration API" as COAPI
-participant "BlockSight API" as BS
+participant "CO Identity" as Identity
+participant "Bank Backend" as Bank
+participant "Bank XR" as BankXR
+participant "CO XR" as COXR
+participant "CO API" as COAPI
+participant "BlockSight" as BS
 
 == Identity and eligibility ==
 
@@ -122,16 +131,22 @@ Identity --> COAPI: Eligibility satisfied
 
 == Wallet intelligence ==
 
-COAPI -> BS: GET wallet intelligence\nBearer: BlockSight API key
-BS --> COAPI: 202 Accepted\njob_id\nestimated_ready_at
-
-loop Poll until completed
-    COAPI -> BS: GET /v1/jobs/{job_id}
-    BS --> COAPI: 200 OK\nqueued / initializing / running
+COAPI -> BS: GET /v1/wallets/{chain}/{wallet_address}/intelligence\nAuthorization: Bearer <BlockSight API key>
+alt Already indexed
+    BS --> COAPI: 200 OK\nwallet intelligence
+else Indexing required
+    BS --> COAPI: 202 Accepted\njob_id\nestimated_ready_at
+    loop Poll until terminal state
+        COAPI -> BS: GET /v1/jobs/{job_id}
+        BS --> COAPI: queued / initializing / running\ncompleted / failed / expired
+    end
+    alt completed
+        COAPI -> BS: GET wallet intelligence
+        BS --> COAPI: 200 OK\nwallet intelligence
+    else failed or expired
+        COAPI -> COAPI: Handle terminal failure
+    end
 end
-
-COAPI -> BS: GET wallet intelligence
-BS --> COAPI: 200 OK\nwallet scores / risk / intelligence
 
 == Decision ==
 
@@ -146,8 +161,10 @@ Bank --> User: Allow / deny / review
 
 ## Responsibilities
 
-**ComplyOnce:** identity, KYC, ZK/eligibility, X-Road, orchestration and final policy decision.
+**ComplyOnce:** end-user authentication, KYC data, zero-knowledge proof verification, eligibility, X-Road infrastructure and configuration, BlockSight orchestration, and final authorization and policy decisions.
 
-**BlockSight:** wallet ingestion, scoring, risk intelligence, API authentication, tenant isolation and metering.
+**BlockSight:** wallet ingestion, behavioral and risk intelligence, scoring, API authentication, tenant isolation, and usage metering.
 
-This document records the intended integration boundary, subject to confirmation by both teams.
+BlockSight supplies intelligence to ComplyOnce; it does not make the end-user authorization decision.
+
+**Tenant model to confirm:** one ComplyOnce BlockSight tenant and credential, or separately agreed per-bank tenancy and metering.
